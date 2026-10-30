@@ -1,3 +1,5 @@
+![Banner](banner.png)
+
 # analyze-text-obfuscation-detector
 Identifies various text obfuscation techniques used to mask potentially malicious code or content, such as character substitution, encoding, or insertion of whitespace. Reports detected obfuscation types and potential severity. - Focused on Data analysis and reporting
 
