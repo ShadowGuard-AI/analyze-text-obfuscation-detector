@@ -2,6 +2,7 @@ import argparse
 import logging
 import pandas as pd
 import re
+import sys
 import base64
 
 # Configure logging
@@ -27,19 +28,13 @@ def detect_character_substitution(text):
     Returns:
         bool: True if character substitution is detected, False otherwise.
     """
-    # Common substitutions: l -> 1, o -> 0, etc.
-    substitution_patterns = [
-        (r'l', r'1'),
-        (r'o', r'0'),
-        (r'e', r'3'),
-        (r'a', r'4'),
-        (r's', r'5'),
-        (r't', r'7'),
-    ]
-
-    for original, substitute in substitution_patterns:
-        if re.search(substitute, text, re.IGNORECASE):
-            logging.debug(f"Character substitution detected: {original} -> {substitute}")
+    # Leet digits that stand in for letters: 1, 0, 3, 4, 5, 7.
+    # A digit only counts inside a token that also holds a letter. Testing
+    # the raw text for any of these digits, as an earlier version did,
+    # flagged ordinary prose such as "call 2024 now" as substitution.
+    for token in re.findall(r"[A-Za-z0-9]+", text):
+        if any(ch.isalpha() for ch in token) and any(ch in "013457" for ch in token):
+            logging.debug(f"Character substitution suspected in token: {token}")
             return True
     return False
 
@@ -54,6 +49,10 @@ def detect_base64_encoding(text):
         bool: True if Base64 encoding is detected, False otherwise.
     """
     try:
+        # The whole file is decoded as one blob, so a base64 string embedded
+        # in surrounding prose is missed: with validate=True the spaces and
+        # words around it fail the decode. Whole blob files are the case
+        # this detector can actually judge.
         # Attempt to decode the text as Base64.  This is a heuristic; it might
         # produce garbage if the text isn't actually Base64, but we're just
         # looking for the *possibility* of obfuscation.  Reject anything that
@@ -136,10 +135,10 @@ def main():
                 text = f.read()
         except FileNotFoundError:
             logging.error(f"Input file not found: {input_file_path}")
-            return
+            sys.exit(1)
         except Exception as e:
             logging.error(f"Error reading input file: {e}")
-            return
+            sys.exit(1)
 
         # Perform the analysis
         analysis_results = analyze_text(text)
@@ -153,28 +152,18 @@ def main():
             logging.info(f"Analysis results saved to: {output_file_path}")
         except Exception as e:
             logging.error(f"Error saving results to CSV: {e}")
-            return
+            sys.exit(1)
 
         # Print a summary of the results
         print("\nAnalysis Summary:")
         for technique, detected in analysis_results.items():
             print(f"- {technique.replace('_', ' ').title()}: {'Detected' if detected else 'Not Detected'}")
 
+    except SystemExit:
+        raise
     except Exception as e:
         logging.exception(f"An unexpected error occurred: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
-
-"""
-Usage Examples:
-
-1. Analyze a file named 'malicious_code.txt' and save the results to 'analysis.csv':
-   python main.py malicious_code.txt -o analysis.csv
-
-2. Analyze a file named 'input.txt' with verbose logging enabled:
-   python main.py input.txt -v
-
-3. Analyze a file named 'data.txt' and save the results to the default output file ('obfuscation_analysis.csv'):
-   python main.py data.txt
-"""
