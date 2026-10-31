@@ -38,9 +38,47 @@ def detect_character_substitution(text):
             return True
     return False
 
+def _whole_blob_decodes(text):
+    """Original whole text test: decode the text as one base64 blob."""
+    try:
+        stripped = text.strip().rstrip('=')
+        missing_padding = len(stripped) % 4
+        if missing_padding:
+            stripped += '=' * (4 - missing_padding)
+        decoded_text = base64.b64decode(stripped, validate=True).decode('utf-8', 'ignore')
+        return bool(decoded_text)
+    except Exception as e:
+        logging.debug(f"Base64 blob detection failed: {e}")
+        return False
+
+
+def _token_decodes(token):
+    """Test one candidate token extracted from running text.
+
+    A token counts only when it is canonical base64 (re-encoding the
+    decoded bytes reproduces the token) and the decoded bytes are
+    readable text. That keeps long ordinary words from counting.
+    """
+    try:
+        padded = token + '=' * (-len(token) % 4)
+        decoded_bytes = base64.b64decode(padded, validate=True)
+        if not decoded_bytes:
+            return False
+        decoded_text = decoded_bytes.decode('utf-8')
+        if not decoded_text or not decoded_text.isprintable():
+            return False
+        return base64.b64encode(decoded_bytes).decode('ascii') == padded
+    except Exception:
+        return False
+
+
 def detect_base64_encoding(text):
     """
     Detects Base64 encoding obfuscation techniques.
+
+    The whole text is tested as one blob, and candidate base64 tokens
+    embedded in the text are also extracted and tested one by one, so
+    a base64 string inside ordinary prose is detected as well.
 
     Args:
         text (str): The text to analyze.
@@ -48,37 +86,14 @@ def detect_base64_encoding(text):
     Returns:
         bool: True if Base64 encoding is detected, False otherwise.
     """
-    try:
-        # The whole file is decoded as one blob, so a base64 string embedded
-        # in surrounding prose is missed: with validate=True the spaces and
-        # words around it fail the decode. Whole blob files are the case
-        # this detector can actually judge.
-        # Attempt to decode the text as Base64.  This is a heuristic; it might
-        # produce garbage if the text isn't actually Base64, but we're just
-        # looking for the *possibility* of obfuscation.  Reject anything that
-        # isn't valid base64 encoding.
-
-        # Remove padding first (padding is not needed)
-        text = text.rstrip('=')
-
-        # Add padding if necessary to make length a multiple of 4
-        missing_padding = len(text) % 4
-        if missing_padding:
-            text += '=' * (4 - missing_padding)
-
-        decoded_text = base64.b64decode(text, validate=True).decode('utf-8', 'ignore')
-
-        # Check if the decoded text produces *something*. An empty decoded string is not helpful.
-        if decoded_text:
-            logging.debug("Base64 encoding detected.")
+    if _whole_blob_decodes(text):
+        logging.debug("Base64 encoding detected in the whole text.")
+        return True
+    for token in re.findall(r"[A-Za-z0-9+/]{16,}={0,2}", text):
+        if _token_decodes(token):
+            logging.debug("Base64 encoding detected in an embedded token.")
             return True
-        else:
-            return False
-
-    except Exception as e:
-        # Not a valid Base64 string or other error.
-        logging.debug(f"Base64 detection failed: {e}")
-        return False
+    return False
 
 def detect_whitespace_insertion(text):
     """
@@ -111,6 +126,10 @@ def analyze_text(text):
         'base64_encoding': detect_base64_encoding(text),
         'whitespace_insertion': detect_whitespace_insertion(text),
     }
+    # Severity comes from how many of the three checks hit:
+    # 0 is none, 1 is low, 2 is medium, and 3 is high.
+    hit_count = sum(1 for value in results.values() if value)
+    results['severity'] = {0: 'none', 1: 'low', 2: 'medium', 3: 'high'}[hit_count]
     return results
 
 def main():
@@ -157,7 +176,10 @@ def main():
         # Print a summary of the results
         print("\nAnalysis Summary:")
         for technique, detected in analysis_results.items():
-            print(f"- {technique.replace('_', ' ').title()}: {'Detected' if detected else 'Not Detected'}")
+            if technique == 'severity':
+                print(f"- Severity: {detected}")
+            else:
+                print(f"- {technique.replace('_', ' ').title()}: {'Detected' if detected else 'Not Detected'}")
 
     except SystemExit:
         raise
