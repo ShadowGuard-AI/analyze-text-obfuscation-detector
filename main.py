@@ -41,6 +41,11 @@ def detect_character_substitution(text):
 def _whole_blob_decodes(text):
     """Original whole text test: decode the text as one base64 blob."""
     try:
+        # This half is far looser than the token test below. Decoding
+        # with errors ignored means any blob that decodes to at least
+        # one surviving character counts, even if the bytes were never
+        # text at all. The canonical check in _token_decodes exists
+        # because this test alone flagged too much; both still run.
         stripped = text.strip().rstrip('=')
         missing_padding = len(stripped) % 4
         if missing_padding:
@@ -106,6 +111,10 @@ def detect_whitespace_insertion(text):
         bool: True if whitespace insertion is detected, False otherwise.
     """
     # Check for excessive whitespace.
+    # \s covers newlines and tabs, not just spaces, so a blank line in
+    # ordinary prose, or code aligned in columns, is three whitespace
+    # characters in a row and trips this. It is the weakest of the
+    # three checks and the one I trust least on its own.
     if re.search(r'\s{3,}', text):  # Three or more consecutive whitespace characters.
         logging.debug("Whitespace insertion detected.")
         return True
@@ -128,6 +137,10 @@ def analyze_text(text):
     }
     # Severity comes from how many of the three checks hit:
     # 0 is none, 1 is low, 2 is medium, and 3 is high.
+    # Every check weighs the same in that count, so the whitespace
+    # check above counts as much toward high as a canonical base64
+    # token does. Severity here means breadth of signals, nothing
+    # about how strong any one of them is.
     hit_count = sum(1 for value in results.values() if value)
     results['severity'] = {0: 'none', 1: 'low', 2: 'medium', 3: 'high'}[hit_count]
     return results
