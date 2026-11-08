@@ -1,10 +1,10 @@
-![The seabed listening array: housings bolted to plates on a quiet floor, a cable sagging into blue hush, nothing readable](intro-banner.png)
+![Twig close up where the stick insect's legs grip the bark and its head lifts clear of the line of the wood, scarlet berries soft behind it](intro-banner.png)
 
 # analyze-text-obfuscation-detector
 
-![A line of hydrophones receding on a sagging cable, the nearest housing carrying the worn stencil name](banner.png)
+![Spray of bare twigs against soft leaf green, two stick insects hidden along separate twigs at different depths and one scarlet berry cluster at the frame edge](banner.png)
 
-![A reef turquoise hydrophone housing on a bolted plate with three coral pink listening rings broken at an orange crack](logo.png)
+![One bare brown twig running diagonally with a single stick insect laid exactly along it, its body the same colour and line as the wood, and one scarlet berry at the twig's tip](logo.png)
 
 ![The array in three depth bands: light shafts and rising bubbles, fixed housings with spreading listening rings, shells and a pearl strand near](scene.svg)
 
